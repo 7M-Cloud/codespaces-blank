@@ -1,0 +1,52 @@
+(function execute(inputs, outputs) {
+  
+  
+  // Put all variables into an array to find later
+  var vararr = {};
+  var debugstring ='';
+  
+  var jsonpayload = '';
+  branch = inputs.branchname;
+  if (gs.getProperty('instance_name') == "nestle") {
+    branch = 'main';
+  }
+  jsonpayload = '{\n  "resources": {"repositories": {"self": {"refName": "refs/heads/' + branch + '"}}},\n';
+  jsonpayload +=     '  "variables": {\n';
+  var v = new GlideRecord('sc_item_option_mtom');
+  v.addQuery('request_item', inputs.myReq.sys_id);
+  v.orderBy('sc_item_option.order');
+  v.query();
+  while (v.next()) {
+    //var questionType = v.sc_item_option.item_option_new.type;
+    //var question = v.sc_item_option.item_option_new.getDisplayValue();
+    var question = v.sc_item_option.item_option_new.name.getDisplayValue();
+    var questiontype = v.sc_item_option.item_option_new.type;
+    if (!(/^formatter/.test(question))) {
+      var answer = v.sc_item_option.value.getDisplayValue();
+      var reftable = v.sc_item_option.item_option_new.reference;
+      if (reftable && answer) { //Reference
+        var referencegr = new GlideRecord(reftable);
+        referencegr.addQuery('sys_id', '=', answer);
+        referencegr.query();
+        //gs.info('sys_id: '+answer+',question:'+question);
+        //gs.info('referencegr rowcount:  '+(referencegr.getRowCount()));
+        while (referencegr.next()) {
+           answer = referencegr.getDisplayValue();
+        }
+      } else {
+        //gs.info('Reftable for question '+question+' is empty');
+      }  
+      //gs.info('question: '+question+', answer: '+answer+', questiontype:'+questionType+', reference: '+reftable);
+      if (questiontype == 25) {  //for masked variables
+        jsonpayload += '    "'+question+'": {"value": "'+answer+'","isSecret": true},\n'; 
+      } else {
+        jsonpayload += '    "'+question+'": {"value": "'+answer+'"},\n'; 
+      }
+    }
+  }
+ 
+  jsonpayload += '    "ticket": {"value": "'+inputs.myReq.getDisplayValue('number')+'"}\n'; 
+  //jsonpayload += '    "ticket": {"value": "'+inputs.sctask+'"}\n';
+  jsonpayload += '  }\n}\n';
+  outputs.jsonpayload = jsonpayload;
+})(inputs, outputs);
